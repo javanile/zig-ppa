@@ -1,1 +1,10 @@
+# Javanile Zig PPA — aggiungi la riga corrispondente alla tua Ubuntu:
+#
+#   Ubuntu 20.04 LTS (Focal Fossa)
 deb https://javanile.org/zig-ppa/ubuntu focal main
+#
+#   Ubuntu 22.04 LTS (Jammy Jellyfish)
+# deb https://javanile.org/zig-ppa/ubuntu jammy main
+#
+#   Ubuntu 24.04 LTS (Noble Numbat)
+# deb https://javanile.org/zig-ppa/ubuntu noble main

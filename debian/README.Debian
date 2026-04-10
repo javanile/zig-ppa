@@ -1,0 +1,9 @@
+Zig for Debian/Ubuntu
+=====================
+
+See <https://ziglang.org/documentation/master/> for the official documentation.
+
+Use <https://github.com/ziglang/zig/issues> for bug reports regarding Zig itself.
+
+Use <https://github.com/javanile/zig-ppa/issues> for bug reports and
+feature requests regarding the packaging of Zig for Debian/Ubuntu.

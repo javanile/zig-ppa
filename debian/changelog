@@ -1,0 +1,6 @@
+zig (@ZIG_VERSION@-1) unstable; urgency=low
+
+  * Package Zig @ZIG_VERSION@ for Ubuntu/Debian.
+  * Upstream tarball: https://ziglang.org/download/@ZIG_VERSION@/zig-linux-x86_64-@ZIG_VERSION@.tar.xz
+
+ -- @MAINTAINER@  @DATE@

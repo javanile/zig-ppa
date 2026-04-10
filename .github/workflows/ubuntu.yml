@@ -1,0 +1,72 @@
+name: Ubuntu PPA Install Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      zig_versions:
+        description: "Versioni Zig da testare (JSON array)"
+        required: false
+        default: '["0.13.0"]'
+      ubuntu_codenames:
+        description: "Distro Ubuntu da testare (JSON array)"
+        required: false
+        default: '["focal", "jammy", "noble"]'
+
+jobs:
+  test:
+    name: "zig ${{ matrix.zig_version }} @ ubuntu ${{ matrix.ubuntu_codename }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        zig_version:
+          - "0.13.0"
+        ubuntu_codename:
+          - focal    # Ubuntu 20.04 LTS
+          - jammy    # Ubuntu 22.04 LTS
+          - noble    # Ubuntu 24.04 LTS
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v5
+        with:
+          context: tests/ubuntu
+          push: false
+          load: true
+          tags: zig-ppa-test:${{ matrix.ubuntu_codename }}-${{ matrix.zig_version }}
+          build-args: |
+            UBUNTU_CODENAME=${{ matrix.ubuntu_codename }}
+            ZIG_VERSION=${{ matrix.zig_version }}
+            PPA_URL=https://javanile.org/zig-ppa/ubuntu
+          cache-from: type=gha,scope=${{ matrix.ubuntu_codename }}-${{ matrix.zig_version }}
+          cache-to: type=gha,scope=${{ matrix.ubuntu_codename }}-${{ matrix.zig_version }},mode=max
+
+      - name: Run — verifica versione installata
+        run: |
+          docker run --rm \
+            zig-ppa-test:${{ matrix.ubuntu_codename }}-${{ matrix.zig_version }}
+
+      - name: Run — smoke test hello world
+        run: |
+          docker run --rm \
+            zig-ppa-test:${{ matrix.ubuntu_codename }}-${{ matrix.zig_version }} \
+            sh -c '
+              tmpdir=$(mktemp -d)
+              cd "$tmpdir"
+              zig init
+              zig build run 2>&1 | grep -q "All your codebase are belong to us" || \
+              zig build run 2>&1 | grep -qi "hello" || \
+              { echo "Smoke test fallito"; exit 1; }
+              echo "Smoke test OK"
+            '

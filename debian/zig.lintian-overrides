@@ -1,0 +1,21 @@
+# none of these originate from Zig per se
+zig: spelling-error-in-binary usr/lib/zig/@ZIG_VERSION@/zig *
+
+# the binary is statically linked
+zig: shared-lib-without-dependency-information usr/lib/zig/@ZIG_VERSION@/zig
+
+# not packaging for the Debian archive yet
+zig: new-package-should-close-itp-bug
+
+# yes, it's true
+zig: extra-license-file usr/lib/zig/@ZIG_VERSION@/lib/zig/libc/mingw/COPYING
+zig: extra-license-file usr/lib/zig/@ZIG_VERSION@/lib/zig/libcxx/LICENSE.TXT
+zig: extra-license-file usr/lib/zig/@ZIG_VERSION@/lib/zig/libcxxabi/LICENSE.TXT
+zig: extra-license-file usr/lib/zig/@ZIG_VERSION@/lib/zig/libunwind/LICENSE.TXT
+
+# yes, it's true
+zig: package-contains-empty-directory usr/lib/zig/@ZIG_VERSION@/lib/zig/std/net/
+zig: package-contains-empty-directory usr/lib/zig/@ZIG_VERSION@/lib/zig/std/unicode/
+
+# yes, it's true
+zig: binary-without-manpage usr/bin/zig

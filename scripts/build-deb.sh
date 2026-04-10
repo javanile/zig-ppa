@@ -9,7 +9,7 @@
 #   sudo apt install debhelper dpkg-dev devscripts curl jq xz-utils
 #
 # Output:
-#   ubuntu/zig_VERSION-1_amd64.deb
+#   ubuntu/pool/main/z/zig/zig_VERSION-1_amd64.deb
 
 set -euo pipefail
 
@@ -36,9 +36,10 @@ PKG_NAME="zig"
 PKG_VERSION="${ZIG_VERSION}-${DEB_REVISION}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DEBIAN_TEMPLATE="${REPO_ROOT}/debian"
 BUILD_DIR="${REPO_ROOT}/build/zig-${ZIG_VERSION}"
 ORIG_TARBALL="${REPO_ROOT}/build/${PKG_NAME}_${ZIG_VERSION}.orig.tar.xz"
-OUTPUT_DIR="${REPO_ROOT}/ubuntu"
+OUTPUT_DIR="${REPO_ROOT}/ubuntu/pool/main/z/zig"
 
 ##############################################################################
 # Funzioni
@@ -50,6 +51,27 @@ require_cmd() {
     command -v "$1" &>/dev/null || error "Comando non trovato: $1 — installa con: sudo apt install ${2:-$1}"
 }
 
+# Copia un file da debian/ sostituendo i placeholder
+install_template() {
+    local src="${DEBIAN_TEMPLATE}/$1"
+    local dst="${BUILD_DIR}/debian/$1"
+    mkdir -p "$(dirname "$dst")"
+    sed \
+        -e "s|@ZIG_VERSION@|${ZIG_VERSION}|g" \
+        -e "s|@MAINTAINER@|${MAINTAINER}|g" \
+        -e "s|@DATE@|${BUILD_DATE}|g" \
+        -e "s|@TARBALL_URL@|${TARBALL_URL}|g" \
+        "$src" > "$dst"
+}
+
+# Copia un file statico da debian/ senza modifiche
+install_static() {
+    local src="${DEBIAN_TEMPLATE}/$1"
+    local dst="${BUILD_DIR}/debian/$1"
+    mkdir -p "$(dirname "$dst")"
+    cp "$src" "$dst"
+}
+
 ##############################################################################
 # Prerequisiti
 ##############################################################################
@@ -58,6 +80,9 @@ require_cmd jq jq
 require_cmd sha256sum coreutils
 require_cmd dpkg-buildpackage dpkg-dev
 require_cmd dh debhelper
+
+[[ -d "$DEBIAN_TEMPLATE" ]] || \
+    error "Directory debian/ non trovata in $REPO_ROOT — assicurati di eseguire lo script dalla root del repo."
 
 ##############################################################################
 # Step 3 — Scarica il tarball ufficiale
@@ -105,112 +130,65 @@ info "Preparo la struttura di build in $BUILD_DIR ..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# Estrai il tarball upstream nella directory di build
+# Estrai il tarball upstream
 info "Estraggo $TARBALL_CACHE ..."
 tar -xf "$TARBALL_CACHE" --strip-components=1 -C "$BUILD_DIR"
 
-# Crea l'orig tarball (richiesto da dpkg-buildpackage formato 3.0 quilt)
+# Orig tarball (richiesto da dpkg-buildpackage in formato 3.0 quilt)
 if [[ ! -f "$ORIG_TARBALL" ]]; then
     info "Creo orig tarball: $ORIG_TARBALL ..."
     cp "$TARBALL_CACHE" "$ORIG_TARBALL"
 fi
 
-# Copia i file debian nella directory di build
-DEBIAN_DIR="${BUILD_DIR}/debian"
-mkdir -p "$DEBIAN_DIR/source"
+# Data di build (usata nei template)
+BUILD_DATE=$(date -R)
 
-# control
-cat > "$DEBIAN_DIR/control" <<EOF
-Source: zig
-Priority: optional
-Section: devel
-Maintainer: $MAINTAINER
-Build-Depends:
- debhelper (>= 10),
- dpkg-dev (>= 1.19)
-Standards-Version: 4.6.2
-Homepage: https://ziglang.org
+info "Applico template debian/ per versione ${ZIG_VERSION} ..."
 
-Package: zig
-Architecture: amd64
-Section: devel
-Depends: \${misc:Depends}
-Description: General-purpose programming language and toolchain
- Zig is a general-purpose programming language and toolchain for maintaining
- robust, optimal, and reusable software.
- .
- This package contains the Zig executable (zig) as well as the standard
- library.
-EOF
+# File statici — copiati così come sono
+install_static "control"
+install_static "rules"
+install_static "compat"
+install_static "copyright"
+install_static "watch"
+install_static "README.Debian"
+install_static "zig.doc-base"
+install_static "source/format"
+install_static "source/local-options"
+install_static "source/lintian-overrides"
 
-# changelog
-DATE=$(date -R)
-cat > "$DEBIAN_DIR/changelog" <<EOF
-zig (${PKG_VERSION}) unstable; urgency=low
+# File template — @ZIG_VERSION@, @MAINTAINER@, @DATE@, @TARBALL_URL@ sostituiti
+install_template "changelog"
+install_template "zig.install"
+install_template "zig.links"
+install_template "zig.dirs"
+install_template "zig.lintian-overrides"
 
-  * Package Zig ${ZIG_VERSION} for Ubuntu/Debian.
-  * Upstream tarball: ${TARBALL_URL}
-
- -- ${MAINTAINER}  ${DATE}
-EOF
-
-# compat
-echo "10" > "$DEBIAN_DIR/compat"
-
-# rules
-cat > "$DEBIAN_DIR/rules" <<'EOF'
-#!/usr/bin/make -f
-export LC_ALL=C.UTF-8
-export DH_VERBOSE=1
-
-%:
-	dh $@
-EOF
-chmod +x "$DEBIAN_DIR/rules"
-
-# source/format
-echo "3.0 (quilt)" > "$DEBIAN_DIR/source/format"
-
-# zig.dirs
-cat > "$DEBIAN_DIR/zig.dirs" <<EOF
-usr/lib/zig
-usr/lib/zig/${ZIG_VERSION}
-EOF
-
-# zig.install — include doc solo se presente nel tarball
-INSTALL_CONTENT="zig usr/lib/zig/${ZIG_VERSION}
-lib usr/lib/zig/${ZIG_VERSION}"
-
+# doc/langref.html: aggiunge la riga in zig.install solo se presente nel tarball
 if [[ -f "${BUILD_DIR}/doc/langref.html" ]]; then
-    INSTALL_CONTENT+="
-doc/langref.html usr/share/doc/zig"
+    echo "doc/langref.html usr/share/doc/zig" >> "${BUILD_DIR}/debian/zig.install"
 fi
 
-echo "$INSTALL_CONTENT" > "$DEBIAN_DIR/zig.install"
+chmod +x "${BUILD_DIR}/debian/rules"
 
-# zig.links
-cat > "$DEBIAN_DIR/zig.links" <<EOF
-usr/lib/zig/${ZIG_VERSION}/zig usr/bin/zig
-EOF
-
-info "File debian generati per versione ${ZIG_VERSION}."
+info "File debian pronti."
 
 ##############################################################################
 # Step 6 — Esegui debuild
 ##############################################################################
-info "Avvio debuild in $BUILD_DIR ..."
+info "Avvio dpkg-buildpackage in $BUILD_DIR ..."
 cd "$BUILD_DIR"
 dpkg-buildpackage -b -uc -us
 
 ##############################################################################
-# Step 7 — Salva il .deb come artifact
+# Step 7 — Salva il .deb nel pool
 ##############################################################################
 mkdir -p "$OUTPUT_DIR"
 
 DEB_FILE=$(find "${REPO_ROOT}/build" -maxdepth 1 -name "zig_${PKG_VERSION}_*.deb" | head -1)
 
 if [[ -z "$DEB_FILE" ]]; then
-    error "File .deb non trovato in ${REPO_ROOT}/build/ dopo debuild."
+    error "File .deb non trovato in ${REPO_ROOT}/build/ dopo dpkg-buildpackage."
 fi
 
 cp "$DEB_FILE" "$OUTPUT_DIR/"

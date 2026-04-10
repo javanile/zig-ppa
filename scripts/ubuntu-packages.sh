@@ -1,45 +1,55 @@
 #!/usr/bin/env bash
-# ubuntu-packages.sh — Genera i file indice APT per il PPA zig-ppa@javanile.org
+# ubuntu-packages.sh — Genera i file indice APT (struttura Launchpad-compatibile)
 #
 # Uso:
-#   ./scripts/ubuntu-packages.sh
+#   ./scripts/ubuntu-packages.sh [CODENAME...]
+#   ./scripts/ubuntu-packages.sh              # aggiorna tutte le distro
+#   ./scripts/ubuntu-packages.sh focal jammy  # aggiorna solo queste
+#
+# Struttura generata (identica a Launchpad):
+#   ubuntu/
+#     pool/main/z/zig/          ← i .deb risiedono qui
+#     dists/<codename>/
+#       Release
+#       InRelease
+#       Release.gpg
+#       main/binary-amd64/
+#         Packages
+#         Packages.gz
+#       main/binary-arm64/
+#         Packages
+#         Packages.gz
+#
+# sources.list dell'utente finale:
+#   deb https://javanile.org/zig-ppa/ubuntu focal main
 #
 # Prerequisiti:
-#   - dpkg-dev      (per dpkg-scanpackages)
-#   - apt-utils     (per apt-ftparchive)
-#   - gzip
-#   - gpg           (con chiave privata ubuntu/private.gpg già importata)
-#
-# Genera in ubuntu/:
-#   Packages        — indice dei pacchetti .deb
-#   Packages.gz     — versione compressa
-#   Release         — metadati del repository
-#   InRelease       — Release firmato inline (GPG clearsign)
-#   Release.gpg     — firma detached
+#   sudo apt install dpkg-dev gzip gpg
 
 set -euo pipefail
 
 ##############################################################################
 # Configurazione
 ##############################################################################
-REPO_DIR="ubuntu"
-PRIVATE_KEY_FILE="ubuntu/private.gpg"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_DIR="${REPO_ROOT}/ubuntu"
+PRIVATE_KEY_FILE="${REPO_DIR}/private.gpg"
 GPG_EMAIL="zig-ppa@javanile.org"
 
 ORIGIN="Javanile Zig PPA"
 LABEL="zig-ppa"
-CODENAME="focal"
 SUITE="stable"
 COMPONENT="main"
-ARCHITECTURES="amd64 arm64"
+ARCHITECTURES=("amd64" "arm64")
 DESCRIPTION="Unofficial Zig compiler PPA by Javanile"
 
+ALL_CODENAMES=("focal" "jammy" "noble")
+
 ##############################################################################
-# Funzioni di supporto
+# Funzioni
 ##############################################################################
 info()  { echo "[INFO]  $*"; }
 error() { echo "[ERROR] $*" >&2; exit 1; }
-
 require_cmd() { command -v "$1" &>/dev/null || error "Comando non trovato: $1 — installa con: sudo apt install ${2:-$1}"; }
 
 ##############################################################################
@@ -48,6 +58,15 @@ require_cmd() { command -v "$1" &>/dev/null || error "Comando non trovato: $1 �
 require_cmd dpkg-scanpackages dpkg-dev
 require_cmd gzip gzip
 require_cmd gpg gpg
+
+##############################################################################
+# Distro da processare
+##############################################################################
+if [[ $# -gt 0 ]]; then
+    CODENAMES=("$@")
+else
+    CODENAMES=("${ALL_CODENAMES[@]}")
+fi
 
 ##############################################################################
 # Importa chiave privata nel keyring (se non già presente)
@@ -62,9 +81,8 @@ KEY_FP=$(gpg --list-secret-keys --with-colons 2>/dev/null \
       done | head -1)
 
 if [[ -z "$KEY_FP" ]]; then
-    if [[ ! -f "$PRIVATE_KEY_FILE" ]]; then
-        error "Chiave privata non trovata: $PRIVATE_KEY_FILE"$'\n'"Esegui prima: ./scripts/ubuntu-gpg-key.sh"
-    fi
+    [[ -f "$PRIVATE_KEY_FILE" ]] || \
+        error "Chiave privata non trovata: $PRIVATE_KEY_FILE — esegui prima: ./scripts/ubuntu-gpg-key.sh"
     info "Importo chiave privata da $PRIVATE_KEY_FILE ..."
     gpg --import "$PRIVATE_KEY_FILE"
     KEY_FP=$(gpg --list-secret-keys --with-colons "$GPG_EMAIL" 2>/dev/null \
@@ -74,101 +92,143 @@ fi
 info "Chiave GPG: $KEY_FP"
 
 ##############################################################################
-# Genera Packages e Packages.gz
+# Pool — i .deb risiedono in ubuntu/pool/main/z/zig/
 ##############################################################################
-info "Scansiono i file .deb in $REPO_DIR/ ..."
+POOL_DIR="${REPO_DIR}/pool/main/z/zig"
+mkdir -p "$POOL_DIR"
 
-# dpkg-scanpackages vuole essere eseguito dalla root del repo
-# e il path relativo alla dir dei .deb
-DEB_COUNT=$(find "$REPO_DIR" -maxdepth 1 -name "*.deb" | wc -l)
-if [[ "$DEB_COUNT" -eq 0 ]]; then
-    info "Nessun .deb trovato in $REPO_DIR/ — genero Packages vuoto."
-fi
-
-dpkg-scanpackages --multiversion "$REPO_DIR" /dev/null > "$REPO_DIR/Packages" 2>/dev/null || \
-    dpkg-scanpackages "$REPO_DIR" > "$REPO_DIR/Packages"
-
-gzip -9 -c "$REPO_DIR/Packages" > "$REPO_DIR/Packages.gz"
-
-info "Packages: $(wc -l < "$REPO_DIR/Packages") righe"
+DEB_COUNT=$(find "$POOL_DIR" -maxdepth 1 -name "*.deb" | wc -l)
+info "Pacchetti .deb nel pool: $DEB_COUNT"
 
 ##############################################################################
-# Calcola checksum dei file indice
+# Funzione: calcola checksum
 ##############################################################################
-compute_checksums() {
+checksum_entry() {
     local file="$1"
-    local relpath
-    relpath=$(basename "$file")
-    local size
+    local relpath="$2"
+    local size md5 sha1 sha256
     size=$(wc -c < "$file")
-    local md5 sha1 sha256
-    md5=$(md5sum "$file" | awk '{print $1}')
-    sha1=$(sha1sum "$file" | awk '{print $1}')
+    md5=$(md5sum    "$file" | awk '{print $1}')
+    sha1=$(sha1sum  "$file" | awk '{print $1}')
     sha256=$(sha256sum "$file" | awk '{print $1}')
-    echo "md5:$md5 sha1:$sha1 sha256:$sha256 size:$size name:$relpath"
+    printf "md5:%s sha1:%s sha256:%s size:%s path:%s\n" \
+        "$md5" "$sha1" "$sha256" "$size" "$relpath"
 }
 
-PKG_INFO=$(compute_checksums "$REPO_DIR/Packages")
-PKG_GZ_INFO=$(compute_checksums "$REPO_DIR/Packages.gz")
-
-extract() { echo "$1" | grep -o "${2}:[^ ]*" | cut -d: -f2; }
+extract_field() { echo "$1" | grep -o "${2}:[^ ]*" | cut -d: -f2; }
 
 ##############################################################################
-# Genera Release
+# Genera indice per ogni distro
 ##############################################################################
-info "Genero $REPO_DIR/Release ..."
-
 NOW=$(date -u "+%a, %d %b %Y %H:%M:%S UTC")
 
-cat > "$REPO_DIR/Release" <<EOF
-Origin: $ORIGIN
-Label: $LABEL
-Suite: $SUITE
-Codename: $CODENAME
-Version: 1.0
-Architectures: $ARCHITECTURES
-Components: $COMPONENT
-Description: $DESCRIPTION
-Date: $NOW
-MD5Sum:
- $(extract "$PKG_INFO" md5) $(extract "$PKG_INFO" size) Packages
- $(extract "$PKG_GZ_INFO" md5) $(extract "$PKG_GZ_INFO" size) Packages.gz
-SHA1:
- $(extract "$PKG_INFO" sha1) $(extract "$PKG_INFO" size) Packages
- $(extract "$PKG_GZ_INFO" sha1) $(extract "$PKG_GZ_INFO" size) Packages.gz
-SHA256:
- $(extract "$PKG_INFO" sha256) $(extract "$PKG_INFO" size) Packages
- $(extract "$PKG_GZ_INFO" sha256) $(extract "$PKG_GZ_INFO" size) Packages.gz
-EOF
+for CODENAME in "${CODENAMES[@]}"; do
+    info "--- Processo distro: $CODENAME ---"
 
-##############################################################################
-# Firma: InRelease (clearsign) e Release.gpg (detached)
-##############################################################################
-info "Firmo con GPG (key: $KEY_FP) ..."
+    DIST_DIR="${REPO_DIR}/dists/${CODENAME}"
 
-gpg --default-key "$KEY_FP" \
-    --clearsign \
-    --armor \
-    --output "$REPO_DIR/InRelease" \
-    "$REPO_DIR/Release"
+    # Raccogli i checksum di tutti i Packages per il Release
+    declare -a ALL_MD5=()
+    declare -a ALL_SHA1=()
+    declare -a ALL_SHA256=()
 
-gpg --default-key "$KEY_FP" \
-    --detach-sign \
-    --armor \
-    --output "$REPO_DIR/Release.gpg" \
-    "$REPO_DIR/Release"
+    for ARCH in "${ARCHITECTURES[@]}"; do
+        BIN_DIR="${DIST_DIR}/${COMPONENT}/binary-${ARCH}"
+        mkdir -p "$BIN_DIR"
+
+        # Genera Packages filtrando per architettura (amd64 o arm64) + arch:all
+        # dpkg-scanpackages scansiona il pool e produce path relativi dalla root del repo
+        info "  Genero Packages per ${CODENAME}/${COMPONENT}/binary-${ARCH} ..."
+
+        (
+            cd "$REPO_DIR"
+            dpkg-scanpackages --multiversion \
+                --arch "$ARCH" \
+                "pool/main" \
+                2>/dev/null
+        ) > "${BIN_DIR}/Packages" || true
+
+        # Se l'opzione --arch non è supportata dalla versione installata, fallback senza filtro
+        if [[ ! -s "${BIN_DIR}/Packages" ]]; then
+            (cd "$REPO_DIR"; dpkg-scanpackages --multiversion "pool/main" 2>/dev/null) \
+                > "${BIN_DIR}/Packages" || true
+        fi
+
+        gzip -9 -c "${BIN_DIR}/Packages" > "${BIN_DIR}/Packages.gz"
+
+        PKG_REL="${COMPONENT}/binary-${ARCH}/Packages"
+        PKG_GZ_REL="${COMPONENT}/binary-${ARCH}/Packages.gz"
+
+        PKG_INFO=$(checksum_entry "${BIN_DIR}/Packages"    "$PKG_REL")
+        GZ_INFO=$(checksum_entry  "${BIN_DIR}/Packages.gz" "$PKG_GZ_REL")
+
+        ALL_MD5+=( \
+            " $(extract_field "$PKG_INFO" md5)    $(extract_field "$PKG_INFO" size) $PKG_REL" \
+            " $(extract_field "$GZ_INFO"  md5)    $(extract_field "$GZ_INFO"  size) $PKG_GZ_REL" \
+        )
+        ALL_SHA1+=( \
+            " $(extract_field "$PKG_INFO" sha1)   $(extract_field "$PKG_INFO" size) $PKG_REL" \
+            " $(extract_field "$GZ_INFO"  sha1)   $(extract_field "$GZ_INFO"  size) $PKG_GZ_REL" \
+        )
+        ALL_SHA256+=( \
+            " $(extract_field "$PKG_INFO" sha256) $(extract_field "$PKG_INFO" size) $PKG_REL" \
+            " $(extract_field "$GZ_INFO"  sha256) $(extract_field "$GZ_INFO"  size) $PKG_GZ_REL" \
+        )
+
+        info "  Packages (${ARCH}): $(wc -l < "${BIN_DIR}/Packages") righe"
+    done
+
+    # Genera Release
+    info "  Genero ${DIST_DIR}/Release ..."
+    {
+        echo "Origin: $ORIGIN"
+        echo "Label: $LABEL"
+        echo "Suite: $SUITE"
+        echo "Codename: $CODENAME"
+        echo "Architectures: ${ARCHITECTURES[*]}"
+        echo "Components: $COMPONENT"
+        echo "Description: $DESCRIPTION"
+        echo "Date: $NOW"
+        echo "MD5Sum:"
+        printf '%s\n' "${ALL_MD5[@]}"
+        echo "SHA1:"
+        printf '%s\n' "${ALL_SHA1[@]}"
+        echo "SHA256:"
+        printf '%s\n' "${ALL_SHA256[@]}"
+    } > "${DIST_DIR}/Release"
+
+    # Firma InRelease e Release.gpg
+    info "  Firmo Release per $CODENAME ..."
+    gpg --default-key "$KEY_FP" --clearsign --armor \
+        --output "${DIST_DIR}/InRelease" "${DIST_DIR}/Release"
+
+    gpg --default-key "$KEY_FP" --detach-sign --armor \
+        --output "${DIST_DIR}/Release.gpg" "${DIST_DIR}/Release"
+
+    info "  OK: $CODENAME"
+done
 
 ##############################################################################
 # Riepilogo
 ##############################################################################
 echo ""
 info "============================================================"
-info "Indice APT aggiornato in $REPO_DIR/:"
-for f in Packages Packages.gz Release InRelease Release.gpg; do
-    size=$(wc -c < "$REPO_DIR/$f")
-    info "  $f ($size bytes)"
+info "Repository APT aggiornato."
+info ""
+info "  Pool .deb : ubuntu/pool/main/z/zig/ ($DEB_COUNT pacchetti)"
+info "  Distro    : ${CODENAMES[*]}"
+info "  Data      : $NOW"
+info ""
+info "Struttura generata:"
+for CODENAME in "${CODENAMES[@]}"; do
+    info "  ubuntu/dists/$CODENAME/Release"
+    for ARCH in "${ARCHITECTURES[@]}"; do
+        info "  ubuntu/dists/$CODENAME/${COMPONENT}/binary-${ARCH}/Packages"
+    done
 done
 info ""
-info "Pacchetti .deb indicizzati: $DEB_COUNT"
-info "Data release: $NOW"
+info "sources.list per l'utente finale:"
+for CODENAME in "${CODENAMES[@]}"; do
+    info "  deb https://javanile.org/zig-ppa/ubuntu $CODENAME main"
+done
 info "============================================================"

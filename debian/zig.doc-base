@@ -1,0 +1,10 @@
+Document: zig
+Title: The Zig Programming Language
+Author: Andrew Kelley et al.
+Abstract: Zig is a general-purpose programming language and toolchain for
+ maintaining robust, optimal, and reusable software.
+Section: Programming
+
+Format: HTML
+Index: /usr/share/doc/zig/langref.html
+Files: /usr/share/doc/zig/langref.html

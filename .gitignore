@@ -18,3 +18,11 @@ files
 zig.substvars
 zig/
 build/
+
+# File APT generati da ubuntu-packages.sh (non committare dalla workstation)
+# Su GitHub Actions vanno committati nel branch gh-pages — qui sono temporanei
+ubuntu/dists/*/Release
+ubuntu/dists/*/InRelease
+ubuntu/dists/*/Release.gpg
+ubuntu/dists/*/main/binary-*/Packages
+ubuntu/dists/*/main/binary-*/Packages.gz
