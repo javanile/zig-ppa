@@ -7,9 +7,9 @@
 #
 # Output:
 #   ubuntu/key.gpg          — chiave pubblica (ASCII armored) → committata nel repo
-#   ubuntu/zig-ppa.private.gpg  — chiave privata (ASCII armored) → in .gitignore, custodia manuale
+#   ubuntu/private.gpg  — chiave privata (ASCII armored) → in .gitignore, custodia manuale
 #
-# Per il rinnovo manuale riponi ubuntu/zig-ppa.private.gpg nella directory ubuntu/
+# Per il rinnovo manuale riponi ubuntu/private.gpg nella directory ubuntu/
 # prima di eseguire ./scripts/ubuntu-gpg-key.sh --renew
 
 set -euo pipefail
@@ -20,11 +20,12 @@ set -euo pipefail
 GPG_NAME="Zig PPA"
 GPG_EMAIL="zig-ppa@javanile.org"
 GPG_COMMENT="Javanile Zig PPA signing key"
-GPG_KEY_TYPE="ed25519"
+GPG_KEY_TYPE="eddsa"
+GPG_KEY_CURVE="Ed25519"
 GPG_EXPIRE="2y"
 
 PUBLIC_KEY_FILE="ubuntu/key.gpg"
-PRIVATE_KEY_FILE="ubuntu/zig-ppa.private.gpg"
+PRIVATE_KEY_FILE="ubuntu/private.gpg"
 BATCH_FILE="$(mktemp /tmp/gpg-batch.XXXXXX)"
 
 ##############################################################################
@@ -89,11 +90,12 @@ fi
 # Generazione nuova chiave (solo se non in --renew o keyring vuoto)
 ##############################################################################
 if [[ -z "$KEY_FP" ]]; then
-    info "Genero nuova chiave GPG ($GPG_KEY_TYPE, scadenza $GPG_EXPIRE) ..."
+    info "Genero nuova chiave GPG ($GPG_KEY_CURVE, scadenza $GPG_EXPIRE) ..."
 
     cat > "$BATCH_FILE" <<EOF
 %no-protection
 Key-Type: $GPG_KEY_TYPE
+Key-Curve: $GPG_KEY_CURVE
 Key-Usage: sign
 Name-Real: $GPG_NAME
 Name-Comment: $GPG_COMMENT
@@ -122,7 +124,7 @@ head -3 "$PUBLIC_KEY_FILE"
 echo "..."
 
 ##############################################################################
-# Esporta chiave privata → ubuntu/zig-ppa.private.gpg
+# Esporta chiave privata → ubuntu/private.gpg
 ##############################################################################
 info "Esporto chiave privata → $PRIVATE_KEY_FILE"
 mkdir -p "$(dirname "$PRIVATE_KEY_FILE")"
@@ -148,8 +150,8 @@ info "Per caricare GPG_PRIVATE_KEY via gh CLI:"
 info "  gh secret set GPG_PRIVATE_KEY < $PRIVATE_KEY_FILE"
 info ""
 info "Rinnovo manuale (alla scadenza):"
-info "  1. Riponi $PRIVATE_KEY_FILE nella directory source/"
-info "  2. Esegui: ./ubuntu-gpg-key.sh --renew"
+info "  1. Riponi $PRIVATE_KEY_FILE nella directory ubuntu/"
+info "  2. Esegui: ./scripts/ubuntu-gpg-key.sh --renew"
 info "  3. Committa il nuovo $PUBLIC_KEY_FILE"
 info "  4. Aggiorna il secret GPG_PRIVATE_KEY su GitHub"
 info "============================================================"

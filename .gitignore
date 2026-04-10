@@ -9,7 +9,7 @@
 *~
 
 # GPG private key (custodia manuale — non committare mai)
-source/zig-ppa.private.gpg
+ubuntu/private.gpg
 
 # debuild artifacts
 .debhelper/
