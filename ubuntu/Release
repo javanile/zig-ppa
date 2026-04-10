@@ -1,0 +1,18 @@
+Origin: Javanile Zig PPA
+Label: zig-ppa
+Suite: stable
+Codename: focal
+Version: 1.0
+Architectures: amd64 arm64
+Components: main
+Description: Unofficial Zig compiler PPA by Javanile
+Date: ven, 10 apr 2026 21:43:16 UTC
+MD5Sum:
+ d41d8cd98f00b204e9800998ecf8427e 0 Packages
+ 2db2aaad95d73e3f0d68ab556c42d18e 29 Packages.gz
+SHA1:
+ da39a3ee5e6b4b0d3255bfef95601890afd80709 0 Packages
+ 4b3fb48a34f2181c9d5903752b87fe1f64a968d0 29 Packages.gz
+SHA256:
+ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 0 Packages
+ e52ee189a0b8da61824d93e4cf7ea9ceb59130fdd96614e8f545155a0ce69468 29 Packages.gz
