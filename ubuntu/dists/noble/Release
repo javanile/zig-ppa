@@ -1,0 +1,23 @@
+Origin: Javanile Zig PPA
+Label: zig-ppa
+Suite: stable
+Codename: noble
+Architectures: amd64 arm64
+Components: main
+Description: Unofficial Zig compiler PPA by Javanile
+Date: ven, 10 apr 2026 23:00:23 UTC
+MD5Sum:
+ 494c96622ee8a8d02a345ce30f8c2aac    691 main/binary-amd64/Packages
+ f7bb01518716210df5f2e58431711a53    478 main/binary-amd64/Packages.gz
+ 494c96622ee8a8d02a345ce30f8c2aac    691 main/binary-arm64/Packages
+ 9cb7b23099404708d474978f9c75bb9c    478 main/binary-arm64/Packages.gz
+SHA1:
+ 68845ca44a4c6673f0413384c94b0496dfa8d53b   691 main/binary-amd64/Packages
+ b2da61bb859c85b991dc4c42c601aa1618c0047e   478 main/binary-amd64/Packages.gz
+ 68845ca44a4c6673f0413384c94b0496dfa8d53b   691 main/binary-arm64/Packages
+ 37fca4f64a54ee4280b1dcab0b028ad0617d0470   478 main/binary-arm64/Packages.gz
+SHA256:
+ 4bd25068a6fc03920c7f5c20891c7caa68615ca7ba428b2b078a3b2394b8126e 691 main/binary-amd64/Packages
+ 40aad22cf78961096d3ceae3d8645e504ac16e937fd1cb41eea18a5aea35d485 478 main/binary-amd64/Packages.gz
+ 4bd25068a6fc03920c7f5c20891c7caa68615ca7ba428b2b078a3b2394b8126e 691 main/binary-arm64/Packages
+ b6840821450d8309a8ece7ad0f39c7a0e3efeb1e09cf3b706ca1cdd6906c79e0 478 main/binary-arm64/Packages.gz
