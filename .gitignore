@@ -16,5 +16,4 @@ ubuntu/private.gpg
 debhelper-build-stamp
 files
 zig.substvars
-zig/
 build/
