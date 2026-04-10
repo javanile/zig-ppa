@@ -8,6 +8,9 @@
 # Editor backup files
 *~
 
+# GPG private key (custodia manuale — non committare mai)
+source/zig-ppa.private.gpg
+
 # debuild artifacts
 .debhelper/
 debhelper-build-stamp
