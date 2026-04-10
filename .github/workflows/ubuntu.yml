@@ -1,10 +1,10 @@
 name: Ubuntu PPA Install Test
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  #push:
+  #  branches: [main]
+  #pull_request:
+  #  branches: [main]
   workflow_dispatch:
     inputs:
       zig_versions:
@@ -24,12 +24,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        zig_version:
-          - "0.13.0"
-        ubuntu_codename:
-          - focal    # Ubuntu 20.04 LTS
-          - jammy    # Ubuntu 22.04 LTS
-          - noble    # Ubuntu 24.04 LTS
+        # Coppie esplicite: ogni riga è una combinazione supportata.
+        # Per rimuovere il supporto di una coppia basta commentarla —
+        # non impatta le altre versioni o distro.
+        include:
+          # zig 0.13.0
+          - { zig_version: "0.13.0", ubuntu_codename: focal }   # Ubuntu 20.04 LTS
+          - { zig_version: "0.13.0", ubuntu_codename: jammy }   # Ubuntu 22.04 LTS
+          - { zig_version: "0.13.0", ubuntu_codename: noble }   # Ubuntu 24.04 LTS
 
     steps:
       - name: Checkout
