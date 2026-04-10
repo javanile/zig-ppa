@@ -22,6 +22,10 @@ PPA_URL="${2:-https://javanile.org/zig-ppa/ubuntu}"
 KEYRING_FILE="/usr/share/keyrings/zig-ppa.gpg"
 SOURCES_FILE="/etc/apt/sources.list.d/zig-ppa.list"
 
+# Directory temporanea per lo smoke test — sotto tests/tmp/ (gitignored)
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SMOKE_DIR="${REPO_ROOT}/tests/tmp/smoke-${ZIG_VERSION}"
+
 ##############################################################################
 # Controllo privilegi
 ##############################################################################
@@ -183,14 +187,17 @@ dpkg -s zig | sed 's/^/    /'
 ##############################################################################
 step 7 "Smoke test — zig init + zig build run"
 
-TMPDIR="$(mktemp -d)"
-info "Directory temporanea: $TMPDIR"
+mkdir -p "$SMOKE_DIR"
+info "Directory smoke test: $SMOKE_DIR"
 
 RUNNER="${SUDO_USER:-root}"
 info "Eseguo come utente: $RUNNER"
 
+# Assegna la directory all'utente reale così zig può scrivere la cache
+chown -R "$RUNNER" "$SMOKE_DIR"
+
 su -s /bin/bash "$RUNNER" -c "
-    cd '$TMPDIR'
+    cd '$SMOKE_DIR'
     zig init
     echo ''
     echo '--- zig build run output ---'
@@ -198,7 +205,8 @@ su -s /bin/bash "$RUNNER" -c "
     echo '----------------------------'
 " && ok "Smoke test superato." || { fail "Smoke test fallito."; exit 1; }
 
-rm -rf "$TMPDIR"
+info "Rimuovo directory smoke test: $SMOKE_DIR"
+rm -rf "$SMOKE_DIR"
 
 ##############################################################################
 # Riepilogo

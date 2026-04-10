@@ -17,3 +17,6 @@ debhelper-build-stamp
 files
 zig.substvars
 build/
+
+# Artefatti smoke test locali
+tests/tmp/
